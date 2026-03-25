@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Meal Checker</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --surface: #111; --card: #161616; --border: #252525;
+    --accent: #c8f542; --text: #f0f0f0; --muted: #666;
+    --green: #c8f542; --red: #ff4d4d; --amber: #ffb347;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 15px; line-height: 1.6; min-height: 100vh;
+    padding-bottom: calc(30px + env(safe-area-inset-bottom));
+  }
+
+  header {
+    padding: calc(44px + env(safe-area-inset-top)) 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .h-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin-bottom: 6px; }
+  h1 { font-size: clamp(32px, 9vw, 56px); font-weight: 900; line-height: 0.95; letter-spacing: -0.02em; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .h-sub { margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+  /* DAY PROGRESS BAR */
+  .day-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+  }
+  .day-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .day-date { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+  .reset-btn {
+    font-size: 11px; color: var(--muted); background: none; border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px; cursor: pointer; font-family: inherit;
+  }
+  .macro-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+  .macro {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 10px; text-align: center;
+  }
+  .macro-val { font-size: 17px; font-weight: 900; line-height: 1; }
+  .macro-key { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-top: 2px; }
+  .macro-rem { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .cal-val { color: var(--accent); }
+  .pro-val { color: #42d4f5; }
+  .over { color: var(--red) !important; }
+
+  .progress-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 4px; }
+  .progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .cal-fill { background: var(--accent); }
+  .pro-fill { background: #42d4f5; }
+  .progress-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); }
+
+  /* LOGGED MEALS */
+  .logged-section { padding: 0 20px; margin-top: 16px; display: none; }
+  .logged-section.show { display: block; }
+  .sec-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 8px; }
+  .logged-meals { display: flex; flex-direction: column; gap: 6px; }
+  .logged-meal {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .lm-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .lm-go { background: var(--green); }
+  .lm-maybe { background: var(--amber); }
+  .lm-no { background: var(--red); }
+  .lm-info { flex: 1; }
+  .lm-name { font-size: 13px; font-weight: 500; }
+  .lm-macros { font-size: 11px; color: var(--muted); }
+  .lm-del { background: none; border: none; color: #333; font-size: 16px; cursor: pointer; padding: 2px 6px; }
+  .lm-del:active { color: var(--red); }
+
+  main { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* INPUT */
+  .input-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .input-top { padding: 16px; }
+  .input-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 10px; }
+  .spot-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .spot-btn {
+    padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer;
+    transition: all 0.15s; font-family: inherit;
+  }
+  .spot-btn.active { background: var(--accent); border-color: var(--accent); color: #0a0a0a; font-weight: 700; }
+  textarea {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: inherit; font-size: 14px; line-height: 1.5;
+    padding: 12px; resize: none; min-height: 80px; outline: none; transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: #333; }
+
+  /* LOG TOGGLE */
+  .log-toggle {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted); cursor: pointer;
+  }
+  .toggle-switch {
+    width: 36px; height: 20px; background: var(--border); border-radius: 10px;
+    position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-switch.on { background: var(--accent); }
+  .toggle-knob {
+    width: 16px; height: 16px; background: #fff; border-radius: 50%;
+    position: absolute; top: 2px; left: 2px; transition: left 0.2s;
+  }
+  .toggle-switch.on .toggle-knob { left: 18px; }
+
+  .check-btn {
+    width: 100%; padding: 14px; background: var(--accent); color: #0a0a0a;
+    font-family: inherit; font-size: 14px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.1em; border: none; cursor: pointer; transition: opacity 0.15s;
+  }
+  .check-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .check-btn:not(:disabled):active { opacity: 0.8; }
+
+  /* LOADING */
+  .loading { display: none; text-align: center; padding: 32px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .loading.show { display: block; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { font-size: 13px; color: var(--muted); }
+
+  /* RESULT */
+  .result { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; animation: fadeUp 0.3s ease; }
+  .result.show { display: block; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  .verdict-bar { padding: 16px 18px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border); }
+  .verdict-icon { font-size: 30px; line-height: 1; }
+  .verdict-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 2px; }
+  .verdict-meal { font-size: 14px; font-weight: 700; }
+  .verdict-go .verdict-label { color: var(--green); }
+  .verdict-maybe .verdict-label { color: var(--amber); }
+  .verdict-no .verdict-label { color: var(--red); }
+
+  .result-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+  .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+  .stat-val { font-size: 17px; font-weight: 800; color: var(--accent); line-height: 1; }
+  .stat-key { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-top: 2px; }
+  .reason-block { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .mods { display: flex; flex-direction: column; gap: 6px; }
+  .mod-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 2px; }
+  .mod-item { display: flex; gap: 8px; font-size: 13px; padding: 8px 10px; background: var(--card); border-radius: 6px; color: var(--muted); }
+  .mod-item::before { content: '→'; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+
+  .log-meal-btn {
+    width: 100%; padding: 12px; background: var(--card); color: var(--accent);
+    font-family: inherit; font-size: 13px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; border: none; border-top: 1px solid var(--border); cursor: pointer;
+    transition: background 0.15s;
+  }
+  .log-meal-btn:active { background: var(--border); }
+  .log-meal-btn.logged { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-label">176 lbs &middot; Cut Mode</div>
+  <h1>SHOULD I<br><em>ORDER IT?</em></h1>
+  <div class="h-sub">Tracks what you've eaten today for smarter advice</div>
+</header>
+
+<!-- DAY TRACKER -->
+<div class="day-bar">
+  <div class="day-top">
+    <div class="day-date" id="today-date"></div>
+    <button class="reset-btn" onclick="resetDay()">Reset day</button>
+  </div>
+  <div class="macro-row">
+    <div class="macro">
+      <div class="macro-val cal-val" id="cal-eaten">0</div>
+      <div class="macro-key">Cal eaten</div>
+      <div class="macro-rem" id="cal-rem">2,000 left</div>
+    </div>
+    <div class="macro">
+      <div class="macro-val pro-val" id="pro-eaten">0g</div>
+      <div class="macro-key">Protein</div>
+      <div class="macro-rem" id="pro-rem">175g left</div>
+    </div>
+    <div class="macro">
+      <div class="macro-val" id="meal-count" style="color:var(--text)">0</div>
+      <div class="macro-key">Meals today</div>
+      <div class="macro-rem" id="meals-sub">nothing logged</div>
+    </div>
+  </div>
+  <div class="progress-track"><div class="progress-fill cal-fill" id="cal-bar" style="width:0%"></div></div>
+  <div class="progress-labels"><span>Calories</span><span id="cal-label">0 / 2,000</span></div>
+  <div class="progress-track" style="margin-top:6px"><div class="progress-fill pro-fill" id="pro-bar" style="width:0%"></div></div>
+  <div class="progress-labels"><span>Protein</span><span id="pro-label">0 / 175g</span></div>
+</div>
+
+<!-- LOGGED MEALS LIST -->
+<div class="logged-section" id="logged-section">
+  <div style="height:14px"></div>
+  <div class="sec-label">Eaten today</div>
+  <div class="logged-meals" id="logged-list"></div>
+</div>
+
+<main>
+  <div class="input-card">
+    <div class="input-top">
+      <div class="input-label">Where are you ordering from?</div>
+      <div class="spot-row">
+        <button class="spot-btn" onclick="setSpot(this,'Chipotle')">🌯 Chipotle</button>
+        <button class="spot-btn" onclick="setSpot(this,'Subway')">🥖 Subway</button>
+        <button class="spot-btn" onclick="setSpot(this,'Asian food')">🍱 Asian</button>
+        <button class="spot-btn" onclick="setSpot(this,'Burger/fast food')">🍔 Burgers</button>
+        <button class="spot-btn" onclick="setSpot(this,'Other')">+ Other</button>
+      </div>
+      <div class="input-label">What are you thinking of ordering?</div>
+      <textarea id="meal-input" placeholder="e.g. chicken burrito bowl with rice, black beans, cheese, sour cream and guac..." rows="3"></textarea>
+    </div>
+    <div class="log-toggle" onclick="toggleAutoLog()">
+      <div class="toggle-switch" id="auto-log-switch"><div class="toggle-knob"></div></div>
+      <span>Auto-log meal if I order it</span>
+    </div>
+    <button class="check-btn" id="check-btn" onclick="checkMeal()">Check This Meal ↗</button>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Analyzing your meal...</p>
+  </div>
+
+  <div class="result" id="result"></div>
+</main>
+
+<script>
+  const CAL_TARGET = 2000;
+  const PRO_TARGET = 175;
+
+  let selectedSpot = '';
+  let autoLog = true;
+  let lastResult = null;
+  let mealLogged = false;
+
+  // Load today's meals from storage
+  function getTodayKey() {
+    return 'meals_' + new Date().toDateString();
+  }
+
+  function getTodayMeals() {
+    try { return JSON.parse(localStorage.getItem(getTodayKey()) || '[]'); } catch { return []; }
+  }
+
+  function saveTodayMeals(meals) {
+    localStorage.setItem(getTodayKey(), JSON.stringify(meals));
+  }
+
+  function updateDayDisplay() {
+    const meals = getTodayMeals();
+    const totalCal = meals.reduce((s, m) => s + (m.calories || 0), 0);
+    const totalPro = meals.reduce((s, m) => s + (m.protein || 0), 0);
+
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    document.getElementById('cal-eaten').textContent = totalCal;
+    document.getElementById('pro-eaten').textContent = totalPro + 'g';
+    document.getElementById('meal-count').textContent = meals.length;
+
+    const calRem = CAL_TARGET - totalCal;
+    const proRem = PRO_TARGET - totalPro;
+
+    const calRemEl = document.getElementById('cal-rem');
+    calRemEl.textContent = calRem >= 0 ? calRem + ' left' : Math.abs(calRem) + ' over!';
+    calRemEl.className = 'macro-rem' + (calRem < 0 ? ' over' : '');
+
+    const proRemEl = document.getElementById('pro-rem');
+    proRemEl.textContent = proRem >= 0 ? proRem + 'g left' : 'Goal hit! 💪';
+
+    document.getElementById('meals-sub').textContent = meals.length === 0 ? 'nothing logged' : meals.length === 1 ? '1 meal logged' : meals.length + ' meals logged';
+    document.getElementById('cal-label').textContent = totalCal + ' / 2,000';
+    document.getElementById('pro-label').textContent = totalPro + 'g / 175g';
+
+    document.getElementById('cal-bar').style.width = Math.min(100, (totalCal / CAL_TARGET) * 100) + '%';
+    document.getElementById('pro-bar').style.width = Math.min(100, (totalPro / PRO_TARGET) * 100) + '%';
+    document.getElementById('cal-bar').style.background = totalCal > CAL_TARGET ? 'var(--red)' : 'var(--accent)';
+
+    // Logged meals list
+    const section = document.getElementById('logged-section');
+    const list = document.getElementById('logged-list');
+    if (meals.length === 0) {
+      section.classList.remove('show');
+    } else {
+      section.classList.add('show');
+      list.innerHTML = meals.map((m, i) => `
+        <div class="logged-meal">
+          <div class="lm-dot lm-${m.verdict || 'maybe'}"></div>
+          <div class="lm-info">
+            <div class="lm-name">${m.name}</div>
+            <div class="lm-macros">${m.calories} cal &middot; ${m.protein}g protein${m.spot ? ' &middot; ' + m.spot : ''}</div>
+          </div>
+          <button class="lm-del" onclick="removeMeal(${i})">&#215;</button>
+        </div>
+      `).join('');
+    }
+  }
+
+  function removeMeal(i) {
+    const meals = getTodayMeals();
+    meals.splice(i, 1);
+    saveTodayMeals(meals);
+    updateDayDisplay();
+  }
+
+  function resetDay() {
+    if (confirm('Clear all meals logged today?')) {
+      localStorage.removeItem(getTodayKey());
+      updateDayDisplay();
+    }
+  }
+
+  function logMeal(result, spot) {
+    const cal = parseInt((result.calories || '0').replace(/\D/g, '')) || 0;
+    const pro = parseInt((result.protein || '0').replace(/\D/g, '')) || 0;
+    const meals = getTodayMeals();
+    meals.push({ name: result.meal || 'Meal', calories: cal, protein: pro, verdict: result.verdict, spot });
+    saveTodayMeals(meals);
+    updateDayDisplay();
+  }
+
+  function setSpot(btn, spot) {
+    document.querySelectorAll('.spot-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedSpot = spot;
+  }
+
+  function toggleAutoLog() {
+    autoLog = !autoLog;
+    const sw = document.getElementById('auto-log-switch');
+    autoLog ? sw.classList.add('on') : sw.classList.remove('on');
+  }
+
+  // init toggle state
+  document.getElementById('auto-log-switch').classList.add('on');
+
+  function renderResult(data, spot) {
+    const verdictMap = {
+      go: { icon: '✅', label: 'ORDER IT', cls: 'verdict-go' },
+      maybe: { icon: '⚠️', label: 'ORDER WITH MODS', cls: 'verdict-maybe' },
+      no: { icon: '❌', label: 'SKIP THIS ONE', cls: 'verdict-no' }
+    };
+    const v = verdictMap[data.verdict] || verdictMap['maybe'];
+    const mods = (data.modifications || []).map(m => `<div class="mod-item">${m}</div>`).join('');
+
+    document.getElementById('result').innerHTML = `
+      <div class="verdict-bar ${v.cls}">
+        <div class="verdict-icon">${v.icon}</div>
+        <div>
+          <div class="verdict-label">${v.label}</div>
+          <div class="verdict-meal">${data.meal || ''}</div>
+        </div>
+      </div>
+      <div class="result-body">
+        <div class="stat-row">
+          <div class="stat"><div class="stat-val">${data.calories || '—'}</div><div class="stat-key">Calories</div></div>
+          <div class="stat"><div class="stat-val">${data.protein || '—'}</div><div class="stat-key">Protein</div></div>
+          <div class="stat"><div class="stat-val">${data.rating || '—'}/10</div><div class="stat-key">Cut score</div></div>
+        </div>
+        <div class="reason-block">${data.reasoning || ''}</div>
+        ${mods ? `<div class="mods"><div class="mod-title">Make it better:</div>${mods}</div>` : ''}
+      </div>
+      <button class="log-meal-btn" id="log-btn" onclick="manualLog()">${autoLog ? '✓ Logged to today' : '+ Log this meal to today'}</button>
+    `;
+    document.getElementById('result').classList.add('show');
+
+    if (autoLog) {
+      logMeal(data, spot);
+      mealLogged = true;
+      document.getElementById('log-btn').classList.add('logged');
+    } else {
+      mealLogged = false;
+    }
+  }
+
+  function manualLog() {
+    if (mealLogged || !lastResult) return;
+    logMeal(lastResult, selectedSpot);
+    mealLogged = true;
+    const btn = document.getElementById('log-btn');
+    btn.textContent = '✓ Logged to today';
+    btn.classList.add('logged');
+  }
+
+  async function checkMeal() {
+    const input = document.getElementById('meal-input').value.trim();
+    if (!input) return;
+
+    const btn = document.getElementById('check-btn');
+    btn.disabled = true;
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('result').classList.remove('show');
+
+    const spot = selectedSpot || 'a restaurant';
+    const meals = getTodayMeals();
+    const totalCal = meals.reduce((s, m) => s + (m.calories || 0), 0);
+    const totalPro = meals.reduce((s, m) => s + (m.protein || 0), 0);
+    const calLeft = CAL_TARGET - totalCal;
+    const proLeft = PRO_TARGET - totalPro;
+
+    const todayContext = meals.length > 0
+      ? `Today they have already eaten: ${meals.map(m => `${m.name} (~${m.calories} cal, ${m.protein}g protein)`).join(', ')}. Total so far: ${totalCal} cal, ${totalPro}g protein. Remaining budget: ${calLeft} cal, ${proLeft}g protein.`
+      : `They haven't eaten anything today yet. Full budget available: ${CAL_TARGET} cal, ${PRO_TARGET}g protein.`;
+
+    const prompt = `You are a sports nutrition AI helping a 176 lb college student (intermediate lifter) cutting to show abs. Daily targets: ${CAL_TARGET} calories, ${PRO_TARGET}g protein.
+
+${todayContext}
+
+They are now considering ordering from: ${spot}
+Their order: "${input}"
+
+Factor in what they've already eaten today when giving your verdict. If they're close to their calorie limit, be stricter. If they still have a lot of protein left to hit, prioritize high-protein choices.
+
+Respond ONLY with a valid JSON object (no markdown, no backticks):
+{
+  "verdict": "go" | "maybe" | "no",
+  "meal": "short name of what they ordered",
+  "calories": "estimated calories e.g. ~650",
+  "protein": "estimated protein e.g. ~45g",
+  "rating": "cut score 1-10 as number string",
+  "reasoning": "2-3 sentences. Reference what they've eaten today and their remaining budget. Be direct.",
+  "modifications": ["swap or change to make it better"]
+}
+
+verdict: "go" = fits their remaining budget well, "maybe" = okay with mods or slightly over, "no" = blows their budget or very low protein. Max 3 modifications. Empty array [] if verdict is go.`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      const data = await res.json();
+      const text = data.content?.[0]?.text || '';
+      const clean = text.replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(clean);
+      lastResult = parsed;
+      renderResult(parsed, spot);
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+
+    } catch (e) {
+      document.getElementById('result').innerHTML = `
+        <div class="verdict-bar verdict-maybe">
+          <div class="verdict-icon">⚠️</div>
+          <div><div class="verdict-label">ERROR</div><div class="verdict-meal">Couldn't analyze — try again</div></div>
+        </div>`;
+      document.getElementById('result').classList.add('show');
+    }
+
+    document.getElementById('loading').classList.remove('show');
+    btn.disabled = false;
+  }
+
+  document.getElementById('meal-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); checkMeal(); }
+  });
+
+  updateDayDisplay();
+</script>
+</body>
+</html>
